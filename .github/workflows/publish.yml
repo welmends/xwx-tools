@@ -1,0 +1,52 @@
+name: Publish
+
+# Publica no PyPI via Trusted Publishing quando uma tag v* e empurrada.
+# Configure uma vez em pypi.org -> Publishing:
+#   owner: welmends | repo: xwx-tools | workflow: publish.yml | environment: pypi
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Instala o pacote
+        run: python -m pip install -e ".[dev]"
+      - name: Testes
+        run: python -m pytest
+      - name: Confere que a tag bate com __version__
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          version="$(python -c 'import xwx; print(xwx.__version__)')"
+          if [ "$tag" != "$version" ]; then
+            echo "tag $tag != __version__ $version" >&2
+            exit 1
+          fi
+      - name: Build
+        run: |
+          python -m pip install build
+          python -m build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write  # Trusted Publishing: sem token/senha no repo
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
