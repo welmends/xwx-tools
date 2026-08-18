@@ -10,6 +10,13 @@ BINARY = "gcloud"
 
 INSTALL_HINT = "Install the Google Cloud SDK: https://cloud.google.com/sdk/docs/install"
 
+# gcloud offers to enable a disabled API interactively; a read must never block on
+# that prompt, so every non-interactive call runs with prompts turned off.
+NO_PROMPT_ENV = {"CLOUDSDK_CORE_DISABLE_PROMPTS": "1"}
+
+# a single read should never hold the terminal hostage
+READ_TIMEOUT = 30.0
+
 # values gcloud uses to mean "not set"
 _UNSET = {"", "(unset)", "(none)"}
 
@@ -36,7 +43,7 @@ def ensure_installed() -> str:
 
 
 def _value(argv: list[str]) -> str | None:
-    out = shell.capture([BINARY, *argv])
+    out = shell.capture([BINARY, *argv], env=NO_PROMPT_ENV, timeout=READ_TIMEOUT)
     if out is None or out in _UNSET:
         return None
     return out
@@ -56,7 +63,11 @@ def project() -> str | None:
 
 
 def configurations() -> list[str]:
-    out = shell.capture([BINARY, "config", "configurations", "list", "--format=value(name)"])
+    out = shell.capture(
+        [BINARY, "config", "configurations", "list", "--format=value(name)"],
+        env=NO_PROMPT_ENV,
+        timeout=READ_TIMEOUT,
+    )
     if not out:
         return []
     return [line.strip() for line in out.splitlines() if line.strip()]
@@ -131,7 +142,9 @@ def projects() -> list[Project]:
             "list",
             "--sort-by=projectId",
             "--format=value(projectId,name)",
-        ]
+        ],
+        env=NO_PROMPT_ENV,
+        timeout=READ_TIMEOUT,
     )
     if not out:
         return []
@@ -142,3 +155,30 @@ def projects() -> list[Project]:
         project_id, _, name = line.partition("\t")
         found.append(Project(project_id.strip(), name.strip() or None))
     return found
+
+
+def enabled_services(project_id: str | None = None) -> list[str] | None:
+    """APIs enabled on the project, or ``None`` when they cannot be listed."""
+    argv = [BINARY, "services", "list", "--enabled", "--format=value(config.name)"]
+    if project_id:
+        argv.append(f"--project={project_id}")
+    return shell.capture_lines(argv, env=NO_PROMPT_ENV, timeout=READ_TIMEOUT)
+
+
+def billing_enabled(project_id: str) -> bool | None:
+    """Whether billing is active, or ``None`` when it cannot be read."""
+    out = shell.capture(
+        [
+            BINARY,
+            "billing",
+            "projects",
+            "describe",
+            project_id,
+            "--format=value(billingEnabled)",
+        ],
+        env=NO_PROMPT_ENV,
+        timeout=READ_TIMEOUT,
+    )
+    if out is None:
+        return None
+    return out.strip().lower() == "true"

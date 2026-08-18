@@ -220,3 +220,103 @@ def test_missing_gcloud_becomes_exit_127(monkeypatch, capsys):
     monkeypatch.setattr(gcpuse.gcloud, "ensure_installed", boom)
     assert gcpuse.main([]) == 127
     assert "gcloud" in capsys.readouterr().err
+
+
+def _fake_inventory(monkeypatch, *, services=(), findings=(), skipped=(), billing=True):
+    from xwx.core.inventory import Inventory
+
+    monkeypatch.setattr(
+        gcpuse.gcloud,
+        "enabled_services",
+        lambda pid: None if services is None else list(services),
+    )
+    monkeypatch.setattr(gcpuse.gcloud, "billing_enabled", lambda pid: billing)
+    monkeypatch.setattr(
+        gcpuse.inventory,
+        "scan",
+        lambda pid, svcs: Inventory(pid, tuple(svcs), tuple(findings), tuple(skipped)),
+    )
+
+
+def test_resources_reports_counts_and_names(monkeypatch, capsys):
+    from xwx.core.inventory import Finding
+
+    _fake_gcloud(
+        monkeypatch,
+        active="staging",
+        account="me@example.com",
+        project="proj-123",
+        names={"proj-123": "My Project"},
+    )
+    _fake_inventory(
+        monkeypatch,
+        services=["run.googleapis.com", "storage.googleapis.com"],
+        findings=[
+            Finding("Cloud Run", ("api", "web")),
+            Finding("Storage buckets", ()),
+            Finding("Secrets", (), denied=True),
+        ],
+        skipped=["GKE clusters"],
+    )
+    assert gcpuse.main(["--resources"]) == 0
+    out = capsys.readouterr().out
+    assert "My Project (proj-123)" in out
+    assert "enabled" in out
+    assert "Cloud Run" in out and "api, web" in out
+    assert "no access" in out
+    assert "not probed (API off): GKE clusters" in out
+
+
+def test_resources_preview_collapses_long_lists(monkeypatch, capsys):
+    from xwx.core.inventory import Finding
+
+    _fake_gcloud(monkeypatch, account="me@example.com", project="proj-123")
+    _fake_inventory(
+        monkeypatch,
+        services=["secretmanager.googleapis.com"],
+        findings=[Finding("Secrets", ("a", "b", "c", "d", "e"))],
+    )
+    assert gcpuse.main(["--resources"]) == 0
+    assert "a, b, c, +2 more" in capsys.readouterr().out
+
+
+def test_resources_requires_an_account(monkeypatch, capsys):
+    _fake_gcloud(monkeypatch)
+    assert gcpuse.main(["--resources"]) == 1
+    assert "no account logged in" in capsys.readouterr().err
+
+
+def test_resources_requires_a_project(monkeypatch, capsys):
+    _fake_gcloud(monkeypatch, account="me@example.com")
+    assert gcpuse.main(["--resources"]) == 1
+    assert "no project set" in capsys.readouterr().err
+
+
+def test_resources_fails_when_apis_cannot_be_listed(monkeypatch, capsys):
+    _fake_gcloud(monkeypatch, account="me@example.com", project="proj-123")
+    monkeypatch.setattr(gcpuse.gcloud, "enabled_services", lambda pid: None)
+    assert gcpuse.main(["--resources"]) == 1
+    assert "could not list the enabled APIs" in capsys.readouterr().err
+
+
+def test_project_switch_then_resources(monkeypatch, capsys):
+    from xwx.core.inventory import Finding
+
+    calls = _fake_gcloud(
+        monkeypatch,
+        active="staging",
+        account="me@example.com",
+        project="proj-123",
+        names={"proj-456": "Other"},
+    )
+    _fake_inventory(
+        monkeypatch,
+        services=["run.googleapis.com"],
+        findings=[Finding("Cloud Run", ("api",))],
+        billing=False,
+    )
+    assert gcpuse.main(["-p", "proj-456", "--resources"]) == 0
+    assert calls == [("set-project", "proj-456"), ("quota", "proj-456")]
+    out = capsys.readouterr().out
+    assert "disabled" in out
+    assert "Cloud Run" in out

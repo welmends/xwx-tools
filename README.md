@@ -5,7 +5,7 @@ ships as its own executable on your PATH.
 
 | Command  | What it does |
 | -------- | ------------ |
-| `gcpuse` | Switch GCP context (gcloud CLI + Terraform ADC) by named configuration |
+| `gcpuse` | Switch GCP context (gcloud CLI + Terraform ADC), and see what is in a project |
 
 ## Install
 
@@ -31,6 +31,7 @@ Requires the [Google Cloud SDK](https://cloud.google.com/sdk/docs/install) (`gcl
 gcpuse                       # which configuration / account / project am I on?
 gcpuse --list                # list the available configurations (* = active)
 gcpuse --projects            # list the projects visible to the current account (* = current)
+gcpuse --resources           # list what exists inside the active project
 gcpuse staging               # activate 'staging' and re-login (CLI + ADC)
 gcpuse -p my-project-123     # switch project, same account, no re-login
 gcpuse staging -p proj-123   # activate, re-login, then use that project
@@ -54,6 +55,49 @@ Two different jobs, two different commands:
 2. `gcloud auth login` — CLI credentials
 3. `gcloud auth application-default login` — ADC, which is what Terraform uses
 4. `gcloud auth application-default set-quota-project <project of the configuration>`
+
+### Seeing what is inside a project
+
+```bash
+$ gcpuse --resources
+Project           : ERP - Nexvo (project-d70170c7-1a96-4ebb-8d6)
+Billing           : enabled
+Enabled APIs      : 46
+
+resources
+  Cloud Run           3  erp-jiw-backend, erp-jiw-frontend, erp-jiw-payments
+  Cloud SQL           1  erp-jiw-pg
+  Storage buckets     1  erp-jiw-tfstate-project-d70170c7-1a96-4ebb-8d6
+  Secrets            10  erp-jiw-cert-encryption-key, erp-jiw-database-url, +8 more
+  Service accounts    5  erp-jiw-backend, erp-jiw-frontend, erp-jiw-payments, +2 more
+  BigQuery datasets   -
+
+not probed (API off): GKE clusters, Cloud Functions, Firestore databases, ...
+```
+
+There is no single cheap call that lists everything in a project, so `--resources` works
+backwards: it reads which APIs the project has enabled, then probes only those services,
+in parallel. A service whose API is off cannot hold resources, so skipping it is free —
+and it avoids the round trip that would fail anyway. A typical project takes under 10
+seconds.
+
+It composes with switching, reporting on wherever you land:
+
+```bash
+gcpuse -p other-project --resources
+gcpuse wellmend0 --resources
+```
+
+What it is not: an exhaustive audit. It covers a curated set of services (Compute, GKE,
+Cloud Run, Functions, Cloud SQL, Storage, BigQuery, Firestore, Pub/Sub, Artifact
+Registry, Secret Manager, IAM, Cloud DNS, Cloud Build), each with a listing that is cheap
+and needs no region argument. For a guaranteed-complete inventory, use
+[Cloud Asset Inventory](https://cloud.google.com/asset-inventory/docs). Two deliberate
+omissions: **App Engine**, whose listing cannot distinguish "this project has no app"
+from "you lack permission", and **cost** — GCP exposes no API for spend, only a BigQuery
+billing export, so `--resources` reports whether billing is *enabled*, never how much it
+costs. A service that fails for any other reason is shown as `no access` rather than
+being silently dropped.
 
 `gcpuse -p <project-id>` runs:
 
@@ -106,7 +150,7 @@ pushed. The trusted publisher is configured once on pypi.org → *Publishing* wi
 
 ```bash
 # bump __version__ and CHANGELOG.md first
-git tag v0.2.0 && git push origin v0.2.0
+git tag v0.3.0 && git push origin v0.3.0
 ```
 
 ## License

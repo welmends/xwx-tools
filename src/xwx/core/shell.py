@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 
 class CommandNotFound(RuntimeError):
@@ -25,11 +26,25 @@ def require(binary: str, hint: str = "") -> str:
     return path
 
 
-def run(argv: Sequence[str], *, capture: bool = False) -> subprocess.CompletedProcess:
+def _merged_env(env: Mapping[str, str] | None) -> dict[str, str] | None:
+    """Overlay ``env`` on top of the current environment."""
+    if not env:
+        return None
+    return {**os.environ, **env}
+
+
+def run(
+    argv: Sequence[str],
+    *,
+    capture: bool = False,
+    env: Mapping[str, str] | None = None,
+    timeout: float | None = None,
+) -> subprocess.CompletedProcess:
     """Run ``argv``. With ``capture=True`` stderr is silenced and stdout returned.
 
     Never raises on a non-zero exit code — the caller decides what to do with
-    ``returncode``.
+    ``returncode``. A ``timeout`` only applies to captured (non-interactive)
+    runs; interactive ones must be allowed to wait on the user.
     """
     if capture:
         return subprocess.run(
@@ -38,14 +53,40 @@ def run(argv: Sequence[str], *, capture: bool = False) -> subprocess.CompletedPr
             stderr=subprocess.DEVNULL,
             text=True,
             check=False,
+            env=_merged_env(env),
+            timeout=timeout,
         )
-    return subprocess.run(list(argv), check=False)
+    return subprocess.run(list(argv), check=False, env=_merged_env(env))
 
 
-def capture(argv: Sequence[str]) -> str | None:
+def capture(
+    argv: Sequence[str],
+    *,
+    env: Mapping[str, str] | None = None,
+    timeout: float | None = None,
+) -> str | None:
     """Clean stdout of the command, or ``None`` if it failed or came back empty."""
-    proc = run(argv, capture=True)
+    try:
+        proc = run(argv, capture=True, env=env, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return None
     if proc.returncode != 0:
         return None
     out = (proc.stdout or "").strip()
     return out or None
+
+
+def capture_lines(
+    argv: Sequence[str],
+    *,
+    env: Mapping[str, str] | None = None,
+    timeout: float | None = None,
+) -> list[str] | None:
+    """Non-empty stdout lines, or ``None`` when the command failed."""
+    try:
+        proc = run(argv, capture=True, env=env, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return None
+    if proc.returncode != 0:
+        return None
+    return [line.strip() for line in (proc.stdout or "").splitlines() if line.strip()]

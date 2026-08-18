@@ -5,6 +5,7 @@
     gcpuse -p <project>    switch project inside the active configuration
     gcpuse --list          list the available configurations
     gcpuse --projects      list the projects visible to the current account
+    gcpuse --resources     list what exists inside the active project
 """
 
 from __future__ import annotations
@@ -13,7 +14,7 @@ import argparse
 import sys
 
 from xwx import __version__
-from xwx.core import gcloud, ui
+from xwx.core import gcloud, inventory, ui
 from xwx.core.shell import CommandNotFound
 
 PROG = "gcpuse"
@@ -68,6 +69,68 @@ def _list_projects() -> int:
         marker = "* " if project.project_id == current else "  "
         line = f"  {marker}{project.label()}"
         ui.info(ui.paint(line, "cyan") if project.project_id == current else line)
+    return 0
+
+
+# how many resource names to show before collapsing into "+N more"
+_NAME_PREVIEW = 3
+
+
+def _preview(names: tuple[str, ...]) -> str:
+    shown = ", ".join(names[:_NAME_PREVIEW])
+    extra = len(names) - _NAME_PREVIEW
+    return f"{shown}, +{extra} more" if extra > 0 else shown
+
+
+def _print_finding(finding: inventory.Finding, width: int) -> None:
+    label = finding.label.ljust(width)
+    if finding.denied:
+        ui.info(f"  {label} {ui.paint('no access', 'yellow')}")
+    elif finding.count == 0:
+        ui.info(f"  {label} {ui.paint('-', 'dim')}")
+    else:
+        count = str(finding.count).rjust(3)
+        ui.info(f"  {label} {count}  {ui.paint(_preview(finding.names), 'dim')}")
+
+
+def _resources() -> int:
+    """List what exists inside the active project."""
+    if gcloud.account() is None:
+        ui.error("no account logged in.")
+        ui.info(f"Log in first with: {PROG} <configuration>")
+        return 1
+
+    project_id = gcloud.project()
+    if project_id is None:
+        ui.error("no project set on the active configuration.")
+        ui.info(f"Pick one with: {PROG} -p <project-id>")
+        return 1
+
+    services = gcloud.enabled_services(project_id)
+    if services is None:
+        ui.error(f"could not list the enabled APIs of '{project_id}'.")
+        ui.info("You may lack permission on this project, or it may not exist.")
+        return 1
+
+    billing = gcloud.billing_enabled(project_id)
+    ui.kv("Project", _project_label(project_id))
+    ui.kv("Billing", {True: "enabled", False: "disabled", None: "unknown"}[billing])
+    ui.kv("Enabled APIs", str(len(services)))
+
+    found = inventory.scan(project_id, services)
+    ui.info("")
+    if not found.findings:
+        ui.info("No probeable service is enabled on this project.")
+        return 0
+
+    width = max(len(f.label) for f in found.findings)
+    ui.info("resources")
+    for finding in found.findings:
+        _print_finding(finding, width)
+
+    if found.skipped:
+        ui.info("")
+        ui.info(ui.paint(f"not probed (API off): {', '.join(found.skipped)}", "dim"))
     return 0
 
 
@@ -153,7 +216,8 @@ def build_parser() -> argparse.ArgumentParser:
             f"  {PROG} -p my-project-123     switch project, same account, no re-login\n"
             f"  {PROG} staging -p proj-123   activate, re-login, then use that project\n"
             f"  {PROG} --list                list the available configurations\n"
-            f"  {PROG} --projects            list the projects of the current account"
+            f"  {PROG} --projects            list the projects of the current account\n"
+            f"  {PROG} --resources           list what exists inside the active project"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -180,6 +244,12 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         dest="list_projects",
         help="list the projects visible to the current account and exit",
+    )
+    parser.add_argument(
+        "-r",
+        "--resources",
+        action="store_true",
+        help="list what exists inside the active project (probes the enabled APIs)",
     )
     parser.add_argument(
         "--no-login",
@@ -211,16 +281,29 @@ def main(argv: list[str] | None = None) -> int:
             return _list_configurations()
         if args.list_projects:
             return _list_projects()
+
         if args.configuration is not None:
-            return _switch(
+            code = _switch(
                 args.configuration,
                 do_login=not args.no_login,
                 do_adc=not (args.no_login or args.no_adc),
                 project_id=args.project,
             )
-        if args.project is not None:
-            return _switch_project(args.project)
-        return _status()
+        elif args.project is not None:
+            code = _switch_project(args.project)
+        else:
+            code = 0
+        if code != 0:
+            return code
+
+        # --resources composes: switch first, then report on where you landed
+        if args.resources:
+            if args.configuration is not None or args.project is not None:
+                ui.info("")
+            return _resources()
+        if args.configuration is None and args.project is None:
+            return _status()
+        return 0
     except CommandNotFound as exc:
         ui.error(str(exc))
         return 127

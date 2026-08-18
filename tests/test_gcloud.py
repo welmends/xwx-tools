@@ -2,22 +2,24 @@ from xwx.core import gcloud
 
 
 def test_config_get_maps_unset_to_none(monkeypatch):
-    monkeypatch.setattr(gcloud.shell, "capture", lambda argv: "(unset)")
+    monkeypatch.setattr(gcloud.shell, "capture", lambda argv, **kwargs: "(unset)")
     assert gcloud.config_get("project") is None
 
 
 def test_config_get_returns_value(monkeypatch):
-    monkeypatch.setattr(gcloud.shell, "capture", lambda argv: "my-project")
+    monkeypatch.setattr(gcloud.shell, "capture", lambda argv, **kwargs: "my-project")
     assert gcloud.config_get("project") == "my-project"
 
 
 def test_configurations_lists_names(monkeypatch):
-    monkeypatch.setattr(gcloud.shell, "capture", lambda argv: "default\nstaging\n\nprod\n")
+    monkeypatch.setattr(
+        gcloud.shell, "capture", lambda argv, **kwargs: "default\nstaging\n\nprod\n"
+    )
     assert gcloud.configurations() == ["default", "staging", "prod"]
 
 
 def test_configurations_empty(monkeypatch):
-    monkeypatch.setattr(gcloud.shell, "capture", lambda argv: None)
+    monkeypatch.setattr(gcloud.shell, "capture", lambda argv, **kwargs: None)
     assert gcloud.configurations() == []
 
 
@@ -25,7 +27,7 @@ def test_activate_raises_on_failure(monkeypatch):
     class Proc:
         returncode = 1
 
-    monkeypatch.setattr(gcloud.shell, "run", lambda argv, **kw: Proc())
+    monkeypatch.setattr(gcloud.shell, "run", lambda argv, **kwargs: Proc())
     try:
         gcloud.activate("nope")
     except gcloud.GcloudError as exc:
@@ -38,7 +40,7 @@ def test_set_project_raises_on_failure(monkeypatch):
     class Proc:
         returncode = 1
 
-    monkeypatch.setattr(gcloud.shell, "run", lambda argv, **kw: Proc())
+    monkeypatch.setattr(gcloud.shell, "run", lambda argv, **kwargs: Proc())
     try:
         gcloud.set_project("proj-123")
     except gcloud.GcloudError as exc:
@@ -51,7 +53,7 @@ def test_projects_parses_id_and_name(monkeypatch):
     monkeypatch.setattr(
         gcloud.shell,
         "capture",
-        lambda argv: "proj-123\tMy Project\nproj-456\t\n",
+        lambda argv, **kwargs: "proj-123\tMy Project\nproj-456\t\n",
     )
     assert gcloud.projects() == [
         gcloud.Project("proj-123", "My Project"),
