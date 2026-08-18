@@ -5,6 +5,14 @@ follows [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-08-18
+
+### Documentation
+
+- README: an Upgrade section covering pip's cached PyPI index, which reports "already at
+  latest version" right after a release, and the `--no-cache-dir` way around it, plus a
+  pointer to it from Releasing.
+
 ## [0.3.0] - 2026-08-18
 
 ### Added

@@ -21,7 +21,24 @@ Or inside any virtualenv:
 pip install xwx-tools
 ```
 
-Upgrade with `pipx upgrade xwx-tools` (or `pip install -U xwx-tools`).
+## Upgrade
+
+```bash
+pipx upgrade xwx-tools        # or: pip install -U xwx-tools
+```
+
+Right after a release, pip may still be serving a cached copy of the PyPI index and
+report *"already at latest version"* for a version that is no longer the latest. Bypass
+the cache:
+
+```bash
+pipx upgrade xwx-tools --pip-args="--no-cache-dir"
+```
+
+If it still refuses, `pipx install --force xwx-tools` rebuilds the venv from scratch.
+Check what PyPI is actually serving at
+[pypi.org/simple/xwx-tools/](https://pypi.org/simple/xwx-tools/) — that index is the
+source of truth for installs, and it updates before the project page does.
 
 ## gcpuse
 
@@ -150,8 +167,12 @@ pushed. The trusted publisher is configured once on pypi.org → *Publishing* wi
 
 ```bash
 # bump __version__ and CHANGELOG.md first
-git tag v0.3.0 && git push origin v0.3.0
+git tag v0.3.1 && git push origin v0.3.1
 ```
+
+Once the workflow is green, pull the new version onto your own machine with the
+cache-bypassing upgrade above — the freshly published version is exactly the case where
+pip's cached index gets in the way.
 
 ## License
 
