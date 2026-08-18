@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "xwx-tools"
 dynamic = ["version"]
-description = "Caixa de ferramentas de linha de comando: gcpuse (troca de contexto GCP) e outros utilitarios."
+description = "Command-line toolbox: gcpuse (GCP context switching) and other utilities."
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
@@ -31,7 +31,7 @@ Repository = "https://github.com/welmends/xwx-tools"
 Issues = "https://github.com/welmends/xwx-tools/issues"
 Changelog = "https://github.com/welmends/xwx-tools/blob/main/CHANGELOG.md"
 
-# Cada script novo vira uma linha aqui (nome-do-comando = "xwx.cli.modulo:main").
+# Every new script becomes one line here (command-name = "xwx.cli.module:main").
 [project.scripts]
 gcpuse = "xwx.cli.gcpuse:main"
 

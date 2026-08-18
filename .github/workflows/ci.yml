@@ -18,9 +18,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Instala o pacote
+      - name: Install the package
         run: python -m pip install -e ".[dev]"
       - name: Lint
         run: python -m ruff check .
-      - name: Testes
+      - name: Tests
         run: python -m pytest

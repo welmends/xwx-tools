@@ -1,4 +1,4 @@
-"""Execucao de processos externos."""
+"""Running external processes."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from collections.abc import Sequence
 
 
 class CommandNotFound(RuntimeError):
-    """O binario nao esta no PATH."""
+    """The binary is not on PATH."""
 
 
 def which(binary: str) -> str | None:
@@ -18,7 +18,7 @@ def which(binary: str) -> str | None:
 def require(binary: str, hint: str = "") -> str:
     path = which(binary)
     if path is None:
-        message = f"'{binary}' nao encontrado no PATH."
+        message = f"'{binary}' was not found on PATH."
         if hint:
             message = f"{message} {hint}"
         raise CommandNotFound(message)
@@ -26,9 +26,9 @@ def require(binary: str, hint: str = "") -> str:
 
 
 def run(argv: Sequence[str], *, capture: bool = False) -> subprocess.CompletedProcess:
-    """Roda ``argv``. Com ``capture=True`` silencia stderr e devolve stdout.
+    """Run ``argv``. With ``capture=True`` stderr is silenced and stdout returned.
 
-    Nunca levanta em codigo de saida != 0 — quem chama decide o que fazer com
+    Never raises on a non-zero exit code — the caller decides what to do with
     ``returncode``.
     """
     if capture:
@@ -43,7 +43,7 @@ def run(argv: Sequence[str], *, capture: bool = False) -> subprocess.CompletedPr
 
 
 def capture(argv: Sequence[str]) -> str | None:
-    """stdout limpo do comando, ou ``None`` se falhar/vier vazio."""
+    """Clean stdout of the command, or ``None`` if it failed or came back empty."""
     proc = run(argv, capture=True)
     if proc.returncode != 0:
         return None

@@ -1,7 +1,7 @@
 name: Publish
 
-# Publica no PyPI via Trusted Publishing quando uma tag v* e empurrada.
-# Configure uma vez em pypi.org -> Publishing:
+# Publishes to PyPI through Trusted Publishing whenever a v* tag is pushed.
+# Configured once on pypi.org -> Publishing:
 #   owner: welmends | repo: xwx-tools | workflow: publish.yml | environment: pypi
 on:
   push:
@@ -16,11 +16,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Instala o pacote
+      - name: Install the package
         run: python -m pip install -e ".[dev]"
-      - name: Testes
+      - name: Tests
         run: python -m pytest
-      - name: Confere que a tag bate com __version__
+      - name: Check the tag matches __version__
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
           tag="${GITHUB_REF_NAME#v}"
@@ -43,7 +43,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
-      id-token: write  # Trusted Publishing: sem token/senha no repo
+      id-token: write  # Trusted Publishing: no token or password stored in the repo
     steps:
       - uses: actions/download-artifact@v4
         with:

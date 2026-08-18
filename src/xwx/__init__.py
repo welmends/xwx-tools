@@ -1,9 +1,9 @@
-"""xwx — caixa de ferramentas de linha de comando.
+"""xwx — a command-line toolbox.
 
-Cada ferramenta vive em ``xwx.cli.<nome>`` e e exposta como um console_script
-proprio no ``pyproject.toml``. O codigo compartilhado fica em ``xwx.core``.
+Each tool lives in ``xwx.cli.<name>`` and is exposed as its own console_script
+in ``pyproject.toml``. Shared code lives in ``xwx.core``.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = ["__version__"]

@@ -1,58 +1,80 @@
 # xwx-tools
 
-Caixa de ferramentas de linha de comando instalável via `pip`. Um pacote, vários comandos —
-cada script vira um executável próprio no seu PATH.
+A pip-installable command-line toolbox. One package, many commands — each script
+ships as its own executable on your PATH.
 
-| Comando  | O que faz |
-| -------- | --------- |
-| `gcpuse` | Troca de contexto GCP (gcloud CLI + ADC do Terraform) por configuration nomeada |
+| Command  | What it does |
+| -------- | ------------ |
+| `gcpuse` | Switch GCP context (gcloud CLI + Terraform ADC) by named configuration |
 
-## Instalação
+## Install
 
-Recomendado (isolado, sem sujar o Python do sistema):
+Recommended (isolated, without polluting your system Python):
 
 ```bash
 pipx install xwx-tools
 ```
 
-Ou, num virtualenv qualquer:
+Or inside any virtualenv:
 
 ```bash
 pip install xwx-tools
 ```
 
-Atualizar: `pipx upgrade xwx-tools` (ou `pip install -U xwx-tools`).
+Upgrade with `pipx upgrade xwx-tools` (or `pip install -U xwx-tools`).
 
 ## gcpuse
 
-Requer o [Google Cloud SDK](https://cloud.google.com/sdk/docs/install) (`gcloud`) no PATH.
+Requires the [Google Cloud SDK](https://cloud.google.com/sdk/docs/install) (`gcloud`) on PATH.
 
 ```bash
-gcpuse                    # em qual configuration / conta / projeto estou?
-gcpuse --list             # lista as configurations disponíveis (* = ativa)
-gcpuse staging            # ativa 'staging' e refaz o login (CLI + ADC)
-gcpuse staging --no-login # só troca de configuration, sem login
-gcpuse staging --no-adc   # login da CLI, sem refazer a ADC
+gcpuse                       # which configuration / account / project am I on?
+gcpuse --list                # list the available configurations (* = active)
+gcpuse --projects            # list the projects visible to the current account (* = current)
+gcpuse staging               # activate 'staging' and re-login (CLI + ADC)
+gcpuse -p my-project-123     # switch project, same account, no re-login
+gcpuse staging -p proj-123   # activate, re-login, then use that project
+gcpuse staging --no-login    # only switch configuration, no login
+gcpuse staging --no-adc      # CLI login, but leave the ADC alone
 ```
 
-`gcpuse <nome>` faz, em ordem:
+### Switching account vs. switching project
 
-1. `gcloud config configurations activate <nome>`
-2. `gcloud auth login` — credenciais da CLI
-3. `gcloud auth application-default login` — ADC, que é o que o Terraform usa
-4. `gcloud auth application-default set-quota-project <projeto da configuration>`
+Two different jobs, two different commands:
 
-Códigos de saída: `0` ok, `1` erro do gcloud (ou configuration inexistente),
-`127` gcloud não instalado, `130` cancelado com Ctrl-C.
+- **`gcpuse <configuration>`** — different account (or a fresh set of credentials). It
+  activates the configuration and re-runs both logins, which opens a browser.
+- **`gcpuse -p <project-id>`** — different project under the *same* account. It only
+  repoints the active configuration and realigns the ADC quota project. No browser, no
+  re-authentication.
 
-### Criando uma configuration
+`gcpuse <name>` runs, in order:
+
+1. `gcloud config configurations activate <name>`
+2. `gcloud auth login` — CLI credentials
+3. `gcloud auth application-default login` — ADC, which is what Terraform uses
+4. `gcloud auth application-default set-quota-project <project of the configuration>`
+
+`gcpuse -p <project-id>` runs:
+
+1. `gcloud config set project <project-id>` on the active configuration
+2. `gcloud auth application-default set-quota-project <project-id>`
+
+Projects are shown as `Display Name (project-id)`. Resolving the display name needs the
+Cloud Resource Manager API and permission to read the project; when that is unavailable
+the bare project id is shown instead, and switching still works.
+
+Exit codes: `0` success, `1` gcloud error (or unknown configuration), `127` gcloud not
+installed, `130` cancelled with Ctrl-C.
+
+### Creating a configuration
 
 ```bash
 gcloud config configurations create staging
-gcloud config set project meu-projeto-staging
+gcloud config set project my-staging-project
 ```
 
-## Desenvolvimento
+## Development
 
 ```bash
 uv venv && uv pip install -e ".[dev]"
@@ -60,32 +82,33 @@ uv venv && uv pip install -e ".[dev]"
 .venv/bin/python -m ruff check .
 ```
 
-## Adicionando uma ferramenta nova
+## Adding a new tool
 
-1. Crie `src/xwx/cli/minhaferramenta.py` com uma função `main(argv=None) -> int`.
-2. Registre em `pyproject.toml`:
+1. Create `src/xwx/cli/mytool.py` with a `main(argv=None) -> int` function.
+2. Register it in `pyproject.toml`:
 
    ```toml
    [project.scripts]
-   minhaferramenta = "xwx.cli.minhaferramenta:main"
+   mytool = "xwx.cli.mytool:main"
    ```
 
-3. Coisas reaproveitáveis (execução de processos, saída no terminal, wrappers de CLIs
-   externas) vão para `src/xwx/core/`.
-4. Testes em `tests/`, bump da versão em `src/xwx/__init__.py`, tag `vX.Y.Z` → o CI publica.
+3. Anything reusable (process execution, terminal output, wrappers around external CLIs)
+   belongs in `src/xwx/core/`.
+4. Add tests under `tests/`, bump `__version__` in `src/xwx/__init__.py`, push a `vX.Y.Z`
+   tag, and CI publishes it.
 
-## Publicando uma versão
+## Releasing
 
-O workflow `.github/workflows/publish.yml` publica no PyPI via
-[Trusted Publishing](https://docs.pypi.org/trusted-publishers/) quando você empurra uma tag
-`v*`. Configure uma vez em pypi.org → *Publishing*: owner `welmends`, repo `xwx-tools`,
-workflow `publish.yml`, environment `pypi`.
+`.github/workflows/publish.yml` publishes to PyPI through
+[Trusted Publishing](https://docs.pypi.org/trusted-publishers/) whenever a `v*` tag is
+pushed. The trusted publisher is configured once on pypi.org → *Publishing* with owner
+`welmends`, repository `xwx-tools`, workflow `publish.yml`, environment `pypi`.
 
 ```bash
-# edita __version__ e CHANGELOG.md
-git tag v0.1.0 && git push origin v0.1.0
+# bump __version__ and CHANGELOG.md first
+git tag v0.2.0 && git push origin v0.2.0
 ```
 
-## Licença
+## License
 
-MIT — veja [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE).

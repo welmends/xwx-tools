@@ -1,4 +1,4 @@
-"""Saida no terminal: cores opcionais e helpers de impressao."""
+"""Terminal output: optional colors and printing helpers."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from typing import TextIO
 
 
 def color_enabled(stream: TextIO = sys.stdout) -> bool:
-    """Cores so quando faz sentido: TTY, sem NO_COLOR e sem TERM=dumb."""
+    """Colors only when it makes sense: a TTY, no NO_COLOR, no TERM=dumb."""
     if os.environ.get("NO_COLOR"):
         return False
     if os.environ.get("TERM") == "dumb":
@@ -49,12 +49,12 @@ def warn(message: str) -> None:
 
 
 def error(message: str) -> None:
-    print(f"{paint('erro:', 'red', 'bold', stream=sys.stderr)} {message}", file=sys.stderr)
+    print(f"{paint('error:', 'red', 'bold', stream=sys.stderr)} {message}", file=sys.stderr)
 
 
 def kv(label: str, value: str | None, width: int = 18) -> None:
-    """Imprime ``label`` alinhado seguido do valor (ou ``(nenhum)``)."""
-    shown = value if value else paint("(nenhum)", "dim")
+    """Print ``label`` padded to ``width``, followed by the value (or ``(none)``)."""
+    shown = value if value else paint("(none)", "dim")
     print(f"{label.ljust(width)}: {shown}")
 
 

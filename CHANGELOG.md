@@ -1,16 +1,32 @@
 # Changelog
 
-Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/);
-versionamento [SemVer](https://semver.org/lang/pt-BR/).
+Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning
+follows [SemVer](https://semver.org/).
 
-## [Não lançado]
+## [Unreleased]
+
+## [0.2.0] - 2026-08-18
+
+### Added
+
+- `gcpuse -p/--project <id>`: switch project within the active configuration without
+  re-authenticating, realigning the ADC quota project. Combines with a configuration
+  (`gcpuse staging -p proj-123`).
+- `gcpuse --projects`: list the projects visible to the current account, marking the
+  current one.
+
+### Changed
+
+- Projects are now displayed as `Display Name (project-id)` instead of the bare id,
+  falling back to the id when the name cannot be resolved.
+- All code, help text, messages and documentation are now in en-US.
 
 ## [0.1.0] - 2026-08-18
 
-### Adicionado
+### Added
 
-- `gcpuse`: status do contexto GCP, `--list`, troca de configuration com login
-  da CLI + ADC e alinhamento do quota project da ADC.
-- Flags `--no-login` e `--no-adc` para trocar de configuration sem refazer login.
-- Estrutura do pacote `xwx` (`xwx.cli` para comandos, `xwx.core` para código
-  compartilhado) e workflows de CI e publicação no PyPI.
+- `gcpuse`: GCP context status, `--list`, and configuration switching with CLI + ADC
+  login plus ADC quota project alignment.
+- `--no-login` and `--no-adc` flags to switch configuration without re-authenticating.
+- The `xwx` package layout (`xwx.cli` for commands, `xwx.core` for shared code) plus CI
+  and PyPI publishing workflows.

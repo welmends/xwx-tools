@@ -1,1 +1,1 @@
-"""Utilitarios compartilhados entre as ferramentas do xwx."""
+"""Shared helpers used by the xwx tools."""
